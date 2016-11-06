@@ -1,0 +1,291 @@
+
+* Complexity
+As a rough estimate, you'll have 5e8 operations available to solve most problems.
+What input-sizes can be tackled in there?
+
+| Complexity | Size | Examples  |
+| n          |      | Traversal |
+| n log n    |      | Sort      |
+| n^2        |      |           |
+| n^3        |      |           |
+| n^4        |      |           |
+| n^5        |      |           |
+| 2^n        |      |           |
+
+
+* I/O                                                                   :io:
+Reading input is the beginning of every solution.
+
+** Unknown input size
+** Missing \n on last line
+** Vectors
+Reading whole lines and splitting could become a bottleneck!!
+
+*** Line average                                                   :exercise:
+ #+begin_src txt
+ 1 10 15 654 250 ... 2
+ #+end_src
+
+*** Graph adjacency                                                :exercise:
+ #+begin_src txt
+ City1: 2 16
+ City2: 3 1 5 42 27
+ #+end_src
+
+
+
+* Algorithms
+** Math
+*** Greatest common divisor
+*** Matrices
+**** Inverse
+You can append the identity matrix to the right, and then mix rows to take the left part to the reduced row-echelon form (~rref~).
+The identity on the right will accumulate all the necessary transformations, thus, becoming the inverse.
+
+**** 2x2
+***** Inverse
+
+** Geometry
+*** Area
+Recall that the cross product gives out an orthogonal vector (according to the right hand rule), of length equal to the enclosed area of the projections.
+That projection is a parallelogram, and can be cut onto 2 triangles. Those triangles are the key to computing area.
+
+#+begin_src ditaa
+
+			(b)
+			/
+		 /
+		/
+	 0---------------->(a)
+
+			(b)---------------X
+			/                .
+		 /  projection    .      Area = |a x b|
+		/                .
+	 0---------------->(a)
+
+
+#+end_src
+
+
+*** Convex Hull
+Given a set of points, compute the smallest convex polygon that encloses it.
+
+** Recursion
+Reusing solutions to (eventually) simpler problems is often a nice way to solve problems.
+
+A key to avoid confusion on recursive problems is to eliminate the need to unwrap the function, just assume that you are calling a function that already works fine.
+
+
+*** DP
+Coding recursive solutions naively usually results on computing the same /sub-problem/ over and over.
+This is solved by caching.
+
+Usually, the cache for DP problems can be held on an array/matrix, but for some sparse problems it becomes wasteful.
+
+
+** Graph
+*** Model
+**** Handling Implicit Nodes
+Many graph problems state the edges as pairs, but make no attempt on help you creating the nodes first.
+This can easily become a source of extra 20 minute penalty.
+
+This is cleanly avoided with a ~getNode()~ function that lazily creates all nodes, giving the illusion that all nodes already exist.
+
+***** Example                                                  :java:example:
+	#+begin_src java
+	class Node {
+		static HashMap<string, Node> _nodes = new HashMap<string, Node>();
+		string name;
+
+		static Node getNode(string name) {
+			if(_nodes.containsKey(name))
+				return _nodes.get(name);
+			Node n = new Node(name);
+			_nodes.put(name, n);  // Avoid put/get, as you already have `n`.
+			return n;
+		}
+	}
+	#+end_src
+
+
+**** Adjacency list
+Every node holds a list/set of it's successors (nodes reachable)
+
+#+begin_src java
+class Node {
+	string name;
+	HashMap<Node, Integer> successors = new HashMap<Node, Integer>();
+
+	int cost(Node n) {
+		if(successors.containsKey(n))
+			return successors.get(n);
+		return Integer.MAX_VALUE;  // Don't even think of raising exceptions!
+	}
+	static int cost(Node a, Node b) {
+		return a.cost(b);
+	}
+}
+	#+end_src
+
+
+**** Adjacency matrix
+Most of the time you should avoid matrices, as they take up all the space that a complete-graph would.
+
+#+begin_src java
+int[][] cost = new int[N][N];
+for(int i=0; i<N; i++)
+	for(int j=0; j<N; j++)
+		cost[i][j] = Integer.MAX_VALUE;
+#+end_src
+
+*** Search / Traversal                                     :search:traversal:
+
+A search is a traversal that can be terminated earlier (when the goal is found).
+
+To keep track of paths, it suffices to track the parent node ~p~ for each node.
+Then, the path to reach any node, is gathered by following ~p~ until the starting node.
+Note the reverse of that is the path from the start to the node.
+
+
+**** Depth First                                                       :DFS:
+
+DFS traverses a graph by expanding the most recent nodes first.
+This is typically achieved through recursion, but can be done by using an explicit Stack to avoid
+ overflows on the Call-Stack (stack that keeps track of the current execution of your program, includes all functions called and their local variables).
+
+***** Example                                                  :java:example:
+ #+begin_src java
+ void dfs() {
+	 static int time=0;
+	 printf("%3d: Reached %s", time++, this);
+
+	 // Expand
+	 for(Node n : successors())
+		 n.dfs();
+
+	 printf("%3d: Closed %s", time++, this);
+ }
+ #+end_src)
+
+***** Uses
+****** Loop detection                                         :loopDetection:
+	 Loop detection can be done with a DFS traversal, marking nodes completely explored (closed)
+
+ #+begin_src ditaa
+				 D->E->F->G  (closed)
+				/      ^
+ a->b->c->H    |
+				\      |
+				 i->j->k!    (<- current node)
+					\
+					 [l]->(m)  (`l` is pending from i, `m` yet to be discovered)
+ #+end_src
+ Here k finds F, which had already been closed, which is no problem and can be pruned as the descent from F was already done.
+
+ Suppose that after some backtrack, `m` finds `b`. Finding an open nodes implies
+	a loop, as at any step only the path reaching the current node is open.
+
+******* Problems
+	 - [X] [[file:rpc/2016/14/A/A.java][Dwarves]]
+
+
+**** Breadth First                                                     :BFS:
+
+BFS traverses a graph by expanding shallow nodes first.
+Nodes discovered earlier are expanded earlier. This is typically achieved with a Queue.
+
+***** Example                                                  :java:example:
+ #+begin_src java
+ void bfs() {
+	 Queue<Node> q = new Queue<Node>();
+	 int time=0;
+	 while(!q.empty()) {
+		 printf("%3d: Reached %s", time++, this);
+
+		 // Expand
+		 for(Node n : successors())
+			 q.add(n);
+
+		 printf("%3d: Closed %s", time++, this);
+	 }
+ }
+ #+end_src)
+**** Dijkstra                                                      :Dijkstra:
+
+Dijkstra is simmilar to BFS, but takes care of reaching nodes through cost-optimal routes.
+It can be thought as a greedy algorithm, that has to chooses to expand the least expensive node everytime.
+
+Cost to nodes is denoted by ~g~, and is set to ~0~ on the starting node, and ~oo~ for other nodes as they appear to be unreachable.
+
+Expanding (one of) the least expensive node ensures that no sub-optimal path is used.
+Efficient gathering of the least expensive node /requires/ using a /Priority Queue/.
+
+
+***** Example                                                  :java:example:
+ #+begin_src java
+class Node : Comparable<Node> {
+	int g = Integer.MAX_VALUE;
+	ArrayList<Node> neighbors();
+	int compareTo(Node other) {
+		return g-other.g;  // TODO: check the sign
+	}
+}
+
+static void dijkstra(Node n) {
+	PriorityQueue<Node> q = new PriorityQueue<Node>();
+	n.g = 0;
+	q.add(n);
+
+	while(!q.empty()) {  // When overflow is possible, `&& q.peek().g < Integer.MAX_VALUE` is used.  A fixed cost limit may also be useful.
+		Node u = q.pop();
+
+		// Expand u
+		for(Node v : u.neighbors()) {
+			// Reach v through u   (u -> v)
+			int newG = u.g + cost(u,v);
+			if(newG < v.g) {
+				v.g = newG;
+				q.add(v);
+			}
+		}
+
+	}
+}
+ #+end_src)
+
+
+
+**** A^*                                                   :astar:heuristic:
+
+A^* is Dijkstra on the expected-cost space to the closest goal, instead of just the cost space.
+
+This re-ranking of Dijkstra's algorithm performs smarter expansions, focusing them on reaching a goal.
+
+The expected-cost is given by $f=g+h$, ~g~ is the cost cost to reach the node from the start, and ~h~ is a lower-bound on the cost to reach a goal from the node.
+
+It is of utmost importance that ~h~ is a lower-bound, otherwise optimality might be lost (no proof for it).
+
+
+* UVa
+* Kattis
+* RPC
+** 2016 - 14
+[[rpc/2016/14/ProblemsetRPC14.pdf][Problem Set]]
+
+*** [[file:rpc/2016/14/A/A.java][A: Dwarves]]                                            :dfs:loopDetection:
+*** [[I: Common Knowledge]]                                                :easy:
+
+
+* Languages
+** Java
+** C++
+** C
+** Python
+
+* Editors
+** Vim
+** Emacs
+** Eclipse
+
+#  LocalWords:  RPC
